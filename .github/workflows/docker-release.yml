@@ -1,0 +1,111 @@
+# Manual release build of the application image.
+#
+# Actions tab -> "Docker Release" -> "Run workflow", type the version to publish
+# (`v1.0.1`) and the image is pushed to GHCR under two tags: that version and
+# `latest`. Because `latest` is a moving tag it always points at the newest
+# build, so the previous version keeps only its own tag. No commit-SHA tag is
+# produced.
+#
+# Only the newest `KEEP_VERSIONS` versions stay in the registry; the oldest ones
+# are removed after a successful push.
+
+name: Docker Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, for example v1.0.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+# Two releases must never run at the same time: both would push `latest` and
+# prune the registry at the same moment.
+concurrency:
+  group: docker-release
+  cancel-in-progress: false
+
+env:
+  KEEP_VERSIONS: 8
+  # composer.lock points at a mirror the runners cannot reach; the rewrite below
+  # sends composer to api.github.com, which needs a token for ~110 downloads.
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Validate the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected a version like v1.0.1, received '$VERSION'."
+            exit 1
+          fi
+
+      - name: Point the lock file at GitHub for this run
+        run: |
+          # The committed lock keeps the mirror the maintainers use locally; the
+          # runner cannot reach it, so only this working copy is rewritten. The
+          # build context picks the rewritten file up.
+          if grep -q 'https://mirror-composer.runflare.com/repos/' composer.lock; then
+            sed -i 's|https://mirror-composer.runflare.com/repos/|https://api.github.com/repos/|g' composer.lock
+          fi
+
+      - name: Resolve the image, the package and the retention
+        id: names
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          package="${GITHUB_REPOSITORY#*/}"
+          echo "package=${package,,}" >> "$GITHUB_OUTPUT"
+          echo "keep=${KEEP_VERSIONS}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute the tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.names.outputs.image }}
+          tags: |
+            type=raw,value=${{ inputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          secret-envs: composer_auth=COMPOSER_AUTH
+          cache-from: type=gha,scope=release
+          cache-to: type=gha,mode=max,scope=release
+          provenance: true
+          sbom: true
+
+      - name: Prune the versions older than the retention window
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ steps.names.outputs.package }}
+          package-type: container
+          min-versions-to-keep: ${{ steps.names.outputs.keep }}
+          ignore-versions: '^latest$'

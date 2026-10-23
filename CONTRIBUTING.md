@@ -75,7 +75,17 @@ Feature requests that lack a clear use case may be closed.
 
 ### Requirements
 
-- PHP **8.3+**
+- PHP **8.3+** with the **`imagick`** extension, plus the ImageMagick binaries that extension
+  wraps (`convert`, `identify`) and **ghostscript** for PDF input. There is no GD fallback:
+  `config/media-library.php` selects `imagick`, and the Docker image installs nothing else.
+  - **Docker**: nothing to do — the extension, the binaries and ghostscript are part of the `app`
+    image, which also re-enables the PDF coder in ImageMagick's policy.
+  - **Linux host**: `sudo apt-get install imagemagick ghostscript libmagickwand-dev`, then
+    `sudo pecl install imagick`, then allow PDF input in `/etc/ImageMagick-6/policy.xml` (Debian
+    denies it by default).
+  - **Windows host**: install ImageMagick (Q16-HDRI, 64-bit) with *Add application directory to your
+    system path*, install Ghostscript for PDF input, then enable the `php_imagick.dll` matching your
+    PHP version, thread safety and compiler in `php.ini` (`extension=imagick`).
 - Composer **2.x**
 - Node.js **20.19+** or **22.12+** and npm
 - MySQL **8.x** or PostgreSQL **15+**
@@ -84,38 +94,57 @@ Feature requests that lack a clear use case may be closed.
 
 ### Local Installation
 
-Fork the repository, clone your fork, add the upstream remote, then:
+Fork the repository, clone your fork, add the upstream remote, then run every command **inside the
+matching container** — the site runs in Docker and `AGENTS.md` §5 requires `artisan`, `composer` and
+`npm` to run there. The host commands are only the fallback for when the containers are not running.
 
-**Step 1 — Install dependencies**
+**Step 1 — Start the containers**
 
-    composer install
-    npm install
+    docker compose up -d
 
-**Step 2 — Prepare the environment**
+**Step 2 — Install dependencies**
+
+    docker compose exec app composer install
+    docker compose exec app npm install
+
+Host fallback (containers unavailable): `composer install` and `npm install`.
+
+**Step 3 — Prepare the environment**
 
     cp .env.example .env
-    php artisan key:generate
+    docker compose exec app php artisan key:generate
 
-**Step 3 — Configure `.env`**
+Host fallback: `php artisan key:generate`.
 
-Set your database and Redis credentials.
+**Step 4 — Configure `.env`**
 
-**Step 4 — Migrate and seed**
+Set your database and Redis credentials. The container reads the same `.env` through the bind mount.
 
-    php artisan migrate --seed
+**Step 5 — Migrate and seed**
 
-**Step 5 — Link storage (required for Spatie Media Library)**
+    docker compose exec app php artisan migrate --seed
 
-    php artisan storage:link
+Host fallback: `php artisan migrate --seed`.
 
-**Step 6 — Build frontend assets**
+**Step 6 — Link storage (required for Spatie Media Library)**
 
-    npm run dev
+    docker compose exec app php artisan storage:link
 
-**Step 7 — Run the services (in separate terminals)**
+Host fallback: `php artisan storage:link`.
 
-    php artisan serve
-    php artisan horizon
+**Step 7 — Build the frontend assets**
+
+    docker compose exec app npm run build
+
+The production build is the required final state: never leave `npm run dev` running as the last
+step of the setup. Start the dev server only while you work on the frontend, then run
+`npm run build` again before you finish.
+
+**Step 8 — Run the services (in separate terminals)**
+
+    docker compose exec app php artisan horizon
+
+Host fallback: `php artisan serve` and `php artisan horizon`.
 
 We recommend running Horizon locally so you can inspect queued jobs during development.
 
@@ -127,14 +156,14 @@ This project uses a **two-branch** model:
 
 | Branch   | Purpose                                              | Rules                                              |
 |----------|------------------------------------------------------|----------------------------------------------------|
-| `master` | Production-ready code only. Deployed to production.  | **Protected.** No direct pushes, no PRs allowed.   |
+| `main`   | Production-ready code only. Deployed to production.  | **Protected.** No direct pushes, no PRs allowed.   |
 | `dev`    | Active development and integration branch.           | **Protected.** PRs only, no direct pushes.         |
 
 ### Important: PRs are only accepted against `dev`
 
-**Every Pull Request must target the `dev` branch.** Any PR opened against `master` will be **closed automatically without review**. This is enforced by the repository's branch protection rules.
+**Every Pull Request must target the `dev` branch.** Any PR opened against `main` will be **closed automatically without review**. This is enforced by the repository's branch protection rules.
 
-The promotion of changes from `dev` to `master` is handled exclusively by the maintainers through the automated release pipeline.
+The promotion of changes from `dev` to `main` is handled exclusively by the maintainers through the automated release pipeline.
 
 ### Workflow
 
@@ -148,7 +177,7 @@ The promotion of changes from `dev` to `master` is handled exclusively by the ma
 
 3. Push to your fork and open a Pull Request **against `dev`**.
 
-4. After review and merge into `dev`, the release process will promote changes to `master` automatically.
+4. After review and merge into `dev`, the release process will promote changes to `main` automatically.
 
 ### Branch Naming
 
@@ -217,12 +246,18 @@ Commits that don't follow this format may be rejected during review.
 
 ## Pull Request Process
 
-1. **Sync with `dev`** before opening the PR:
+1. **Sync with `dev`** before opening the PR — rebase only while your branch is still local:
 
        git fetch upstream
        git rebase upstream/dev
 
-2. **Target the `dev` branch.** PRs against `master` are closed automatically.
+   Once the task branch has been pushed, do **not** rebase it: the rewrite would require a force
+   push, which this project forbids. Merge `dev` into the branch instead:
+
+       git fetch upstream
+       git merge upstream/dev
+
+2. **Target the `dev` branch.** PRs against `main` are closed automatically.
 
 3. **Fill in the PR template** completely:
    - What the change does and why.
@@ -234,11 +269,13 @@ Commits that don't follow this format may be rejected during review.
 
 5. **One concern per PR.** Don't mix a refactor with a feature.
 
-6. **Ensure CI passes.** All checks (Pint, PHPStan, tests, CodeQL, Docker build) must be green.
+6. **Ensure CI passes.** The `QA` workflow runs the test suite for every branch and every pull
+   request and must be green. Formatting is not part of CI: run `vendor/bin/pint --dirty` locally
+   before you push.
 
 7. **Respond to review comments.** If you disagree, explain why politely. The goal is a better project, not winning an argument.
 
-8. **Rebase, don't merge `dev` into your branch.** Keep a clean, linear history.
+8. **Rebase only local history; merge `dev` into a pushed branch.** A force push is forbidden, so once the branch is public, bring `dev` in with a merge instead of a rebase.
 
 ### Merge Strategy
 
@@ -316,23 +353,29 @@ Guidelines:
 
 ## CI/CD
 
-Every push and PR runs:
+The repository ships four workflows in `.github/workflows`:
 
-1. **Pint** – code style.
-2. **PHPStan** – static analysis.
-3. **PHPUnit / Pest** – tests, with a minimum coverage threshold.
-4. **CodeQL** – security scanning.
-5. **Docker build** – ensures the image builds successfully.
+| Workflow | Trigger | What it does |
+| --- | --- | --- |
+| `QA` | every push and every pull request | installs the PHP and Node dependencies, builds the frontend assets and runs `php artisan test`. Code style is **not** part of it. |
+| `OSV-Scanner` | PRs into `dev`/`main`, pushes to `main`, weekly | scans the dependencies for known vulnerabilities. |
+| `Auto-assign` | a newly opened issue or pull request | assigns it to the maintainer. |
+| `Docker Release` | manual (`workflow_dispatch`) | builds the application image and publishes it to GHCR. |
 
-After a merge to `master`, a `semantic-release` job:
+Formatting is a local step, not a CI check: run `vendor/bin/pint --dirty` before you push.
 
-- Analyzes Conventional Commits.
-- Bumps the version in `composer.json` / `package.json`.
-- Generates `CHANGELOG.md`.
-- Creates a Git tag (`vX.Y.Z`).
-- Builds and pushes a Docker image tagged with the version and `latest`.
+### Docker releases
 
-Do **not** tag releases manually. Let the pipeline do it.
+Releases are published by hand, never by a merge:
+
+1. Open **Actions → Docker Release → Run workflow**.
+2. Pick the branch and type the version to publish, for example `v1.0.1`.
+3. The run pushes `ghcr.io/<owner>/<repo>:v1.0.1` and moves `latest` onto that same image, so the
+   previous release keeps only its own tag. No commit-SHA tag is produced.
+4. After a successful push the registry is pruned: only the newest **8** versions stay, and the
+   oldest ones are deleted.
+
+Do not create release tags by hand; the workflow owns them.
 
 ---
 

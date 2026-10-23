@@ -241,6 +241,14 @@ return [
     /*
      * The engine that should perform the image conversions.
      * Should be either `gd`, `imagick` or `vips`.
+     *
+     * `imagick` is the only engine the application ships: the Dockerfile
+     * installs ImageMagick with the jpeg, png, gif, webp, tiff, heic/avif and
+     * svg delegates, compiles the matching PECL extension and asserts both. PDF
+     * input runs through ghostscript, which the image installs and re-enables
+     * for reading in ImageMagick's coder policy; `spatie/pdf-to-image` is the
+     * package the `Pdf` generator below needs on top of it. `gd` is not
+     * installed at all, so it must never be the fallback here.
      */
     'image_driver' => env('IMAGE_DRIVER', 'imagick'),
 

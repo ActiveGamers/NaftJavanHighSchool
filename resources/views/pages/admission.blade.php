@@ -1,8 +1,5 @@
 @php
-    $faDigits = fn ($value): string => strtr((string) $value, [
-        '0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴',
-        '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹',
-    ]);
+    $faDigits = fn ($value): string => \App\Support\PersianDigits::toPersian($value);
 
     $inputClasses = 'w-full rounded-xl border border-ink-900/15 bg-white px-4 py-3 text-sm text-ink-900 shadow-[0_1px_2px_rgb(7_30_42/0.04)] outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-white/12 dark:bg-ink-950/60 dark:text-white dark:placeholder:text-ink-400 dark:focus:border-brand-400';
 @endphp

@@ -5,6 +5,8 @@
     @php
         $achievementCollection = collect($achievements)->values();
 
+        $faDigits = fn ($value): string => \App\Support\PersianDigits::toPersian($value);
+
         /* The headline achievement: the national first rank, when it is
            recorded; otherwise the first entry of the list. */
         $featured = $achievementCollection->first(
@@ -24,7 +26,7 @@
             ['label' => 'افتخارات'],
         ]"
         :facts="[
-            ['label' => 'دستاوردهای ثبت‌شده', 'value' => $achievementCollection->count().' مورد'],
+            ['label' => 'دستاوردهای ثبت‌شده', 'value' => $faDigits($achievementCollection->count()).' مورد'],
             ['label' => 'بازه زمانی', 'value' => '۱۴۰۱ تا ۱۴۰۳'],
             ['label' => 'سطح رقابت', 'value' => 'کشوری'],
         ]"

@@ -12,6 +12,21 @@ holder.
 Unauthorized copying, modification, distribution, or use of this software,
 via any medium, is strictly prohibited.
 
+Contributions
+
+The contribution workflow described in CONTRIBUTING.md — fork the repository,
+create a task branch, modify the code there and open a pull request against
+`dev` — is expressly permitted by this licence and needs no separate written
+permission. That permission covers the fork, the local modifications and the
+pull request itself, and it ends when the pull request is closed without being
+merged.
+
+By opening a pull request you agree that your contribution is provided under
+the terms of this licence and that the copyright holder may use, modify,
+distribute and sublicense it as part of this software. Any use that goes beyond
+the contribution workflow above still requires the prior written permission of
+the copyright holder.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE

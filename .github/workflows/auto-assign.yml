@@ -1,0 +1,49 @@
+# Assigns every newly opened issue and pull request to the maintainer account.
+#
+# `pull_request_target` instead of `pull_request` is deliberate: a `pull_request`
+# run started from a fork receives a read-only token, so the assignment would
+# fail exactly for outside contributions. This workflow never checks out the
+# contributed code - it only calls the REST API - which is what keeps the target
+# variant safe here.
+
+name: Auto-assign
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  assign:
+    name: Assign to the maintainer
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Add the assignee
+        uses: actions/github-script@v9
+        env:
+          ASSIGNEE: ActiveGamers
+        with:
+          script: |
+            const assignee = process.env.ASSIGNEE;
+            const issueNumber = context.payload.issue?.number ?? context.payload.pull_request?.number;
+
+            if (!issueNumber) {
+              core.setFailed('The event carries neither an issue number nor a pull request number.');
+              return;
+            }
+
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              assignees: [assignee],
+            });
+
+            core.info(`Assigned #${issueNumber} to ${assignee}.`);

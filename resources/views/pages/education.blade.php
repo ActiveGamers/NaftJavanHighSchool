@@ -7,10 +7,7 @@
 
     $totalHours = $allCourses->sum(fn ($course) => (int) ($course->weekly_hours ?? 0));
 
-    $faDigits = fn ($value): string => strtr((string) $value, [
-        '0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴',
-        '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹',
-    ]);
+    $faDigits = fn ($value): string => \App\Support\PersianDigits::toPersian($value);
 @endphp
 
 <x-layouts.app

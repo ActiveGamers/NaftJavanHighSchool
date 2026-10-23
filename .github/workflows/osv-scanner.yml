@@ -7,13 +7,13 @@ name: OSV-Scanner
 
 on:
   pull_request:
-    branches: [ "dev" ]
+    branches: [ "dev", "main" ]
   merge_group:
-    branches: [ "dev" ]
+    branches: [ "dev", "main" ]
   schedule:
     - cron: '31 11 * * 0'
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 permissions:
   # Required to upload SARIF file to CodeQL

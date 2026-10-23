@@ -11,6 +11,13 @@ type: Bug
 **Describe the bug**
 A clear and concise description of what the bug is.
 
+**Steps to reproduce**
+A numbered list of the exact steps that trigger the bug, starting from the URL or page you opened:
+1. Go to '...'
+2. Click on '...'
+3. Scroll down to '...'
+4. See the error
+
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 

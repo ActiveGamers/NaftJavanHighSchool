@@ -33,6 +33,9 @@ function unlockScroll() {
 /** The trigger that opened the drawer; the focus goes back to it on close. */
 let drawerOpener = null;
 
+/** Pending timer that hides the backdrop again after the close animation. */
+let backdropTimer = null;
+
 /** Open the mobile drawer. */
 function openDrawer(drawer, backdrop, opener = null) {
     if (!drawer || drawer.dataset.open === 'true') {
@@ -54,6 +57,10 @@ function openDrawer(drawer, backdrop, opener = null) {
     });
 
     if (backdrop) {
+        /* A quick close/reopen pair leaves the hide timer of the close
+           animation pending: it would hide the backdrop of the drawer that is
+           open again, so it is cancelled before the backdrop is shown. */
+        window.clearTimeout(backdropTimer);
         backdrop.classList.remove('hidden');
         window.requestAnimationFrame(() => backdrop.classList.add('opacity-100'));
     }
@@ -96,7 +103,7 @@ function closeDrawer(drawer, backdrop) {
 
     if (backdrop) {
         backdrop.classList.remove('opacity-100');
-        window.setTimeout(() => backdrop.classList.add('hidden'), 320);
+        backdropTimer = window.setTimeout(() => backdrop.classList.add('hidden'), 320);
     }
 
     unlockScroll();

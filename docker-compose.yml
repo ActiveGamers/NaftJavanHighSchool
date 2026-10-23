@@ -52,9 +52,19 @@
 #   docker compose --profile db up -d          # starts db + app + nginx
 #   docker compose ps                          # wait until the db reports "healthy"
 #
+# The app and the db service read the same DOCKER_DB_* variables, so the
+# credentials of the two services can never drift apart: changing
+# DOCKER_DB_PASSWORD changes the password of the MySQL container and of the
+# Laravel connection at the same time.
+#
 # The DB_* variables below are driven by the DOCKER_DB_* variables and
 # therefore win over the values of the .env file. The MySQL container is
 # published on the loopback interface only (127.0.0.1:${DOCKER_MYSQL_PORT:-3307}).
+#
+# DOCKER_DB_DATABASE carries the MySQL database name. The SQLite driver reads
+# the very same DB_DATABASE variable as a file path, so the default of the app
+# service stays that path; set DOCKER_DB_DATABASE to the database name when you
+# enable the db profile.
 #
 # ---------------------------------------------------------------------------
 # Migrations
@@ -87,10 +97,13 @@ services:
       APP_URL: "${DOCKER_APP_URL:-http://localhost:8080}"
       # Database wiring. The default stays SQLite (the file inside the working
       # copy); the optional "db" profile (MySQL 8) is enabled through the
-      # DOCKER_DB_* variables, see the header of this file.
+      # DOCKER_DB_* variables, see the header of this file. The db service
+      # reads the same variables, so the two services always agree.
       DB_CONNECTION: "${DOCKER_DB_CONNECTION:-sqlite}"
       DB_HOST: "${DOCKER_DB_HOST:-db}"
       DB_PORT: "${DOCKER_DB_PORT:-3306}"
+      # A file path for SQLite, the database name for MySQL: the driver reads
+      # one and the same DB_DATABASE variable, hence the path as the default.
       DB_DATABASE: "${DOCKER_DB_DATABASE:-/var/www/html/database/database.sqlite}"
       DB_USERNAME: "${DOCKER_DB_USERNAME:-naftjavan}"
       DB_PASSWORD: "${DOCKER_DB_PASSWORD:-naftjavan}"
@@ -141,9 +154,11 @@ services:
     image: mysql:8
     profiles: ["db"]
     environment:
-      MYSQL_DATABASE: "${DOCKER_MYSQL_DATABASE:-naftjavan}"
-      MYSQL_USER: "${DOCKER_MYSQL_USER:-naftjavan}"
-      MYSQL_PASSWORD: "${DOCKER_MYSQL_PASSWORD:-naftjavan}"
+      # The same DOCKER_DB_* variables the app service reads, so a changed
+      # password, user or database name reaches both containers.
+      MYSQL_DATABASE: "${DOCKER_DB_DATABASE:-naftjavan}"
+      MYSQL_USER: "${DOCKER_DB_USERNAME:-naftjavan}"
+      MYSQL_PASSWORD: "${DOCKER_DB_PASSWORD:-naftjavan}"
       MYSQL_ROOT_PASSWORD: "${DOCKER_MYSQL_ROOT_PASSWORD:-naftjavan-root}"
     volumes:
       - db_data:/var/lib/mysql

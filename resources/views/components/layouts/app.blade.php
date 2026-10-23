@@ -53,14 +53,27 @@
     <script>
         (function () {
             try {
-                document.documentElement.classList.add('js');
+                var root = document.documentElement;
+
+                root.classList.add('js');
                 var stored = window.localStorage.getItem('theme');
                 var theme = (stored === 'light' || stored === 'dark')
                     ? stored
                     : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-                document.documentElement.classList.toggle('dark', theme === 'dark');
-                document.documentElement.style.colorScheme = theme;
-                document.documentElement.dataset.theme = theme;
+                root.classList.toggle('dark', theme === 'dark');
+                root.style.colorScheme = theme;
+                root.dataset.theme = theme;
+
+                /* The `js` class hides the CSS-only fallback navigation and
+                   assumes the bundle will take over. A blocked, failed or
+                   never-evaluated bundle never sets `app-ready`, so the class
+                   is dropped again: the fallback navigation comes back instead
+                   of leaving the visitor without any mobile navigation. */
+                window.setTimeout(function () {
+                    if (!root.classList.contains('app-ready')) {
+                        root.classList.remove('js');
+                    }
+                }, 3000);
             } catch (error) {
                 /* storage blocked — fall back to the light palette */
             }

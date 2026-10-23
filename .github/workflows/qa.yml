@@ -1,0 +1,89 @@
+# Quality gate for every branch and every pull request.
+#
+# Pint is intentionally absent: formatting stays a local step (`vendor/bin/pint
+# --dirty`, see AGENTS.md) and this run is about behaviour. The suite renders
+# Blade through Vite, so the assets are built before `php artisan test`.
+
+name: QA
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+# The lock file pins its dist archives to a mirror that is not reachable from
+# GitHub runners, so the step below rewrites the URLs and composer downloads
+# from api.github.com instead. That endpoint allows 60 anonymous requests an
+# hour, hence the token.
+env:
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, curl, zip, intl, bcmath, pcntl, exif, imagick
+          coverage: none
+          tools: composer:v2
+
+      - name: Read the Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Composer downloads
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Point the lock file at GitHub for this run
+        run: |
+          # The committed lock keeps the mirror the maintainers use locally; the
+          # runner cannot reach it, so only this working copy is rewritten.
+          if grep -q 'https://mirror-composer.runflare.com/repos/' composer.lock; then
+            sed -i 's|https://mirror-composer.runflare.com/repos/|https://api.github.com/repos/|g' composer.lock
+          fi
+
+      - name: Install the PHP dependencies
+        # package:discover boots the application, and without a .env the
+        # broadcaster falls back to reverb, which cannot be built without keys.
+        # The Dockerfile pins the same variable for its composer step.
+        env:
+          BROADCAST_CONNECTION: 'null'
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install the frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the frontend assets
+        run: npm run build
+
+      - name: Prepare the environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+
+      - name: Run the test suite
+        run: php artisan test

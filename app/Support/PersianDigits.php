@@ -41,11 +41,38 @@ final class PersianDigits
     ];
 
     /**
+     * The Latin digits, mapped to the Persian ones the site prints.
+     *
+     * @var array<string, string>
+     */
+    private const PERSIAN_DIGITS = [
+        '0' => '۰',
+        '1' => '۱',
+        '2' => '۲',
+        '3' => '۳',
+        '4' => '۴',
+        '5' => '۵',
+        '6' => '۶',
+        '7' => '۷',
+        '8' => '۸',
+        '9' => '۹',
+    ];
+
+    /**
      * Convert the Persian and the Arabic-Indic digits of the given value
      * into their Latin ones.
      */
     public static function toLatin(string $value): string
     {
         return strtr($value, self::DIGITS);
+    }
+
+    /**
+     * Convert the Latin digits of the given value into the Persian ones, so
+     * every number the visitor reads on the site uses the same digits.
+     */
+    public static function toPersian(string|int|float|null $value): string
+    {
+        return strtr((string) $value, self::PERSIAN_DIGITS);
     }
 }

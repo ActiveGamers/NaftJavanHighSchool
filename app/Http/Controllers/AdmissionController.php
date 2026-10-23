@@ -37,7 +37,7 @@ class AdmissionController extends Controller
     ): JsonResponse|RedirectResponse {
         $action->handle($request->validated());
 
-        $message = 'درخواست ثبت‌نام شما با موفقیت ثبت شد. برای پیگیری، کادر آموزشی با شماره تماس گرفته‌شده تماس می‌گیرد.';
+        $message = 'درخواست ثبت‌نام شما با موفقیت ثبت شد. برای پیگیری، کادر آموزشی با شمارهٔ تماسی که وارد کرده‌اید تماس می‌گیرد.';
 
         if ($request->expectsJson()) {
             return response()->json([

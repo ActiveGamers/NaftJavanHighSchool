@@ -5,6 +5,7 @@ use App\Models\Achievement;
 use App\Models\Major;
 use App\Models\StaffMember;
 use App\Models\Statistic;
+use App\Support\PersianDigits;
 use App\Support\SchoolContent;
 use Database\Seeders\AchievementSeeder;
 use Database\Seeders\MajorSeeder;
@@ -173,6 +174,17 @@ test('the achievements page labels every result with its scope and school year',
     $response->assertSee('۱۴۰۱');
     $response->assertSee('۱۴۰۲');
     $response->assertSee('۱۴۰۳');
+});
+
+test('the achievements page counts the recorded results in persian digits', function () {
+    $response = $this->get(route('achievements'));
+
+    $response->assertOk();
+
+    $count = Achievement::query()->count();
+
+    $response->assertSee(PersianDigits::toPersian($count).' مورد', false);
+    $response->assertDontSee($count.' مورد', false);
 });
 
 test('the achievements page explains that the record is cumulative', function () {
